@@ -1,0 +1,10 @@
+{
+  "name": "Remix Remix RetinaX",
+  "description": "AI-assisted diabetic retinopathy screening and clinical review platform for doctors, healthcare workers, and patients.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
