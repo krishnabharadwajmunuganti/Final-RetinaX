@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Eye, UserCheck, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle, Smartphone } from 'lucide-react';
+import { Eye, UserCheck, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle, Smartphone, Loader2 } from 'lucide-react';
+import { authApi } from '../../services/api';
 
 interface PatientLoginPageProps {
-  onLoginSuccess: (patientId: string) => void;
+  onLoginSuccess: (patientId: string, token?: string, user?: any) => void;
   onBackToLanding?: () => void;
   onBack?: () => void;
 }
@@ -17,6 +18,7 @@ export const PatientLoginPage: React.FC<PatientLoginPageProps> = ({
   const [otp, setOtp] = useState('849201');
   const [otpSent, setOtpSent] = useState(true);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSendOtp = () => {
     if (!patientId.trim()) {
@@ -28,7 +30,7 @@ export const PatientLoginPage: React.FC<PatientLoginPageProps> = ({
     setOtp('849201');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!patientId.trim()) {
       setError('Please enter your Patient ID (e.g. RX-104582)');
@@ -39,7 +41,15 @@ export const PatientLoginPage: React.FC<PatientLoginPageProps> = ({
       return;
     }
     setError('');
-    onLoginSuccess(patientId.trim());
+    setLoading(true);
+    try {
+      const res = await authApi.login(patientId.trim(), 'PatientPass123!');
+      onLoginSuccess(res.user.id, res.access_token, res.user);
+    } catch (err: any) {
+      setError(err.message || 'Patient ID verification failed. Please check your ID.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFillDemo = () => {
@@ -146,10 +156,20 @@ export const PatientLoginPage: React.FC<PatientLoginPageProps> = ({
             <button
               id="patient-login-submit"
               type="submit"
-              className="w-full mt-2 bg-teal-800 hover:bg-teal-900 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full mt-2 bg-teal-800 hover:bg-teal-900 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
             >
-              <span>Verify & View Screening History</span>
-              <ArrowRight className="w-4 h-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Verifying Credentials...</span>
+                </>
+              ) : (
+                <>
+                  <span>Verify & View Screening History</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 

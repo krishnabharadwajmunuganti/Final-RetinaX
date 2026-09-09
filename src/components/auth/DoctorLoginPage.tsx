@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Eye, Stethoscope, Lock, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Eye, Stethoscope, Lock, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { authApi } from '../../services/api';
 
 interface DoctorLoginPageProps {
-  onLoginSuccess: (doctorId: string) => void;
+  onLoginSuccess: (doctorId: string, token?: string, user?: any) => void;
   onNavigateRegister: () => void;
   onBackToLanding?: () => void;
   onBack?: () => void;
@@ -15,24 +16,33 @@ export const DoctorLoginPage: React.FC<DoctorLoginPageProps> = ({
   onBack,
 }) => {
   const handleBack = onBackToLanding || onBack || (() => {});
-  const [doctorId, setDoctorId] = useState('DOC-9041');
-  const [password, setPassword] = useState('••••••••••••');
+  const [doctorId, setDoctorId] = useState('doctor@retinax.org');
+  const [password, setPassword] = useState('DoctorPass123!');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!doctorId.trim()) {
-      setError('Please enter your Doctor ID (e.g. DOC-9041)');
+      setError('Please enter your Doctor Email or ID (e.g. DOC-9041)');
       return;
     }
     setError('');
-    onLoginSuccess(doctorId.trim());
+    setLoading(true);
+    try {
+      const res = await authApi.login(doctorId.trim(), password);
+      onLoginSuccess(res.user.id, res.access_token, res.user);
+    } catch (err: any) {
+      setError(err.message || 'Invalid doctor credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFillDemo = () => {
-    setDoctorId('DOC-9041');
-    setPassword('ophthalmology_pass_2026');
+    setDoctorId('doctor@retinax.org');
+    setPassword('DoctorPass123!');
     setError('');
   };
 
@@ -127,10 +137,20 @@ export const DoctorLoginPage: React.FC<DoctorLoginPageProps> = ({
             <button
               id="doctor-login-submit"
               type="submit"
-              className="w-full mt-2 bg-teal-800 hover:bg-teal-900 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full mt-2 bg-teal-800 hover:bg-teal-900 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
             >
-              <span>Login to Clinical Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <span>Login to Clinical Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 

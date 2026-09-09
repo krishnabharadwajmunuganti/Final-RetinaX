@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, Stethoscope, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Eye, Stethoscope, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { DoctorUser } from '../../types';
+import { authApi } from '../../services/api';
 
 interface DoctorRegisterPageProps {
   onRegisterSuccess: (newDoctor: DoctorUser) => void;
@@ -28,12 +29,13 @@ export const DoctorRegisterPage: React.FC<DoctorRegisterPageProps> = ({
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.doctorId || !formData.email || !formData.hospital || !formData.regNumber) {
       setError('Please fill in all required clinical credentials');
@@ -44,6 +46,7 @@ export const DoctorRegisterPage: React.FC<DoctorRegisterPageProps> = ({
       return;
     }
     setError('');
+    setLoading(true);
 
     const initials = formData.fullName
       .split(' ')
@@ -52,25 +55,43 @@ export const DoctorRegisterPage: React.FC<DoctorRegisterPageProps> = ({
       .slice(0, 2)
       .toUpperCase() || 'DR';
 
-    const newDoctor: DoctorUser = {
-      id: formData.doctorId,
-      name: formData.fullName.startsWith('Dr.') ? formData.fullName : `Dr. ${formData.fullName}`,
-      role: 'Doctor',
-      email: formData.email,
-      phone: formData.phone || '+1 (555) 000-0000',
-      hospital: formData.hospital,
-      specialization: formData.specialization,
-      regNumber: formData.regNumber,
-      avatarInitials: initials,
-      stats: {
-        reviewed: 0,
-        referred: 0,
-        totalSessions: 0,
-      },
-    };
+    const doctorName = formData.fullName.startsWith('Dr.') ? formData.fullName : `Dr. ${formData.fullName}`;
 
-    onRegisterSuccess(newDoctor);
-    setIsSuccess(true);
+    try {
+      await authApi.register({
+        name: doctorName,
+        email: formData.email,
+        password: formData.password,
+        role: 'doctor',
+        phone: formData.phone,
+        hospital_or_area: formData.hospital,
+        custom_id: formData.doctorId,
+      });
+
+      const newDoctor: DoctorUser = {
+        id: formData.doctorId,
+        name: doctorName,
+        role: 'Doctor',
+        email: formData.email,
+        phone: formData.phone || '+1 (555) 000-0000',
+        hospital: formData.hospital,
+        specialization: formData.specialization,
+        regNumber: formData.regNumber,
+        avatarInitials: initials,
+        stats: {
+          reviewed: 0,
+          referred: 0,
+          totalSessions: 0,
+        },
+      };
+
+      onRegisterSuccess(newDoctor);
+      setIsSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Doctor registration failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, Network, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Eye, Network, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { WorkerUser } from '../../types';
+import { authApi } from '../../services/api';
 
 interface WorkerRegisterPageProps {
   onRegisterSuccess: (newWorker: WorkerUser) => void;
@@ -27,12 +28,13 @@ export const WorkerRegisterPage: React.FC<WorkerRegisterPageProps> = ({
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.workerId || !formData.email || !formData.area || !formData.organization) {
       setError('Please fill in all required field screening worker details');
@@ -43,6 +45,7 @@ export const WorkerRegisterPage: React.FC<WorkerRegisterPageProps> = ({
       return;
     }
     setError('');
+    setLoading(true);
 
     const initials = formData.fullName
       .split(' ')
@@ -51,23 +54,41 @@ export const WorkerRegisterPage: React.FC<WorkerRegisterPageProps> = ({
       .slice(0, 2)
       .toUpperCase() || 'WK';
 
-    const newWorker: WorkerUser = {
-      id: formData.workerId,
-      name: formData.fullName.includes('CHW') ? formData.fullName : `${formData.fullName}, CHW`,
-      role: 'Healthcare Worker',
-      email: formData.email,
-      phone: formData.phone || '+1 (555) 000-0000',
-      area: formData.area,
-      organization: formData.organization,
-      avatarInitials: initials,
-      stats: {
-        patientsRegistered: 0,
-        sessionsCompleted: 0,
-      },
-    };
+    const workerName = formData.fullName.includes('CHW') ? formData.fullName : `${formData.fullName}, CHW`;
 
-    onRegisterSuccess(newWorker);
-    setIsSuccess(true);
+    try {
+      await authApi.register({
+        name: workerName,
+        email: formData.email,
+        password: formData.password,
+        role: 'health_worker',
+        phone: formData.phone,
+        hospital_or_area: formData.area || formData.organization,
+        custom_id: formData.workerId,
+      });
+
+      const newWorker: WorkerUser = {
+        id: formData.workerId,
+        name: workerName,
+        role: 'Healthcare Worker',
+        email: formData.email,
+        phone: formData.phone || '+1 (555) 000-0000',
+        area: formData.area,
+        organization: formData.organization,
+        avatarInitials: initials,
+        stats: {
+          patientsRegistered: 0,
+          sessionsCompleted: 0,
+        },
+      };
+
+      onRegisterSuccess(newWorker);
+      setIsSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Worker registration failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -96,7 +96,6 @@ export const Header: React.FC<HeaderProps> = ({
         return [
           { id: 'home', label: 'Home' },
           { id: 'history', label: 'My History' },
-          { id: 'notifications', label: 'Notifications' },
           { id: 'profile', label: 'Profile' },
         ];
     }
@@ -175,59 +174,61 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right: notification bell + profile chip */}
           <div className="flex items-center gap-4">
-            {/* Notification bell */}
-            <div className="relative">
-              <button
-                id="header-notification-bell"
-                onClick={handleBellClick}
-                className="relative p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none cursor-pointer"
-                title="Notifications"
-                aria-label="View notifications"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#0F766E] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
+            {/* Notification bell - only shown for Doctor and Healthcare Worker */}
+            {currentRole !== 'Patient' && (
+              <div className="relative">
+                <button
+                  id="header-notification-bell"
+                  onClick={handleBellClick}
+                  className="relative p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none cursor-pointer"
+                  title="Notifications"
+                  aria-label="View notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#0F766E] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
 
-              {showNotificationPopup && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowNotificationPopup(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 py-3 z-50 animate-in fade-in-50">
-                    <div className="px-4 pb-2 border-b border-gray-100 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-gray-700 tracking-wider">
-                        Notifications ({notifications.length})
-                      </span>
-                      <button
-                        onClick={() => setShowNotificationPopup(false)}
-                        className="text-gray-400 hover:text-gray-600 p-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                      {notifications.length > 0 ? (
-                        notifications.map((notif, idx) => (
-                          <div key={idx} className="px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 flex items-start gap-2">
-                            <CheckCircle className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
-                            <span>{notif}</span>
+                {showNotificationPopup && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowNotificationPopup(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 py-3 z-50 animate-in fade-in-50">
+                      <div className="px-4 pb-2 border-b border-gray-100 flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase text-gray-700 tracking-wider">
+                          Notifications ({notifications.length})
+                        </span>
+                        <button
+                          onClick={() => setShowNotificationPopup(false)}
+                          className="text-gray-400 hover:text-gray-600 p-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map((notif, idx) => (
+                            <div key={idx} className="px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 flex items-start gap-2">
+                              <CheckCircle className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
+                              <span>{notif}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-gray-400">
+                            No unread notifications
                           </div>
-                        ))
-                      ) : (
-                        <div className="p-4 text-center text-xs text-gray-400">
-                          No unread notifications
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Profile Chip */}
             <div className="relative">

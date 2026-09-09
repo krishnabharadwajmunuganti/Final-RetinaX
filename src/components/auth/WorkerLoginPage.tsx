@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Eye, Network, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Eye, Network, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { authApi } from '../../services/api';
 
 interface WorkerLoginPageProps {
-  onLoginSuccess: (workerId: string) => void;
+  onLoginSuccess: (workerId: string, token?: string, user?: any) => void;
   onNavigateRegister: () => void;
   onBackToLanding?: () => void;
   onBack?: () => void;
@@ -15,24 +16,33 @@ export const WorkerLoginPage: React.FC<WorkerLoginPageProps> = ({
   onBack,
 }) => {
   const handleBack = onBackToLanding || onBack || (() => {});
-  const [workerId, setWorkerId] = useState('WRK-3082');
-  const [password, setPassword] = useState('••••••••••••');
+  const [workerId, setWorkerId] = useState('worker@retinax.org');
+  const [password, setPassword] = useState('WorkerPass123!');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workerId.trim()) {
-      setError('Please enter your Worker ID (e.g. WRK-3082)');
+      setError('Please enter your Worker Email or ID (e.g. WRK-3082)');
       return;
     }
     setError('');
-    onLoginSuccess(workerId.trim());
+    setLoading(true);
+    try {
+      const res = await authApi.login(workerId.trim(), password);
+      onLoginSuccess(res.user.id, res.access_token, res.user);
+    } catch (err: any) {
+      setError(err.message || 'Invalid health worker credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFillDemo = () => {
-    setWorkerId('WRK-3082');
-    setPassword('field_worker_pass_2026');
+    setWorkerId('worker@retinax.org');
+    setPassword('WorkerPass123!');
     setError('');
   };
 
@@ -127,10 +137,20 @@ export const WorkerLoginPage: React.FC<WorkerLoginPageProps> = ({
             <button
               id="worker-login-submit"
               type="submit"
-              className="w-full mt-2 bg-teal-800 hover:bg-teal-900 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full mt-2 bg-teal-800 hover:bg-teal-900 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
             >
-              <span>Login to Field Screening Hub</span>
-              <ArrowRight className="w-4 h-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <span>Login to Field Screening Hub</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 

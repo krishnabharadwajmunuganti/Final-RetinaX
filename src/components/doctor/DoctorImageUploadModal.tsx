@@ -11,6 +11,7 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { DoctorUser, ScreeningSession, AIModelReport } from '../../types';
+import { reportsApi } from '../../services/api';
 
 interface DoctorImageUploadModalProps {
   isOpen: boolean;
@@ -47,10 +48,15 @@ export const DoctorImageUploadModal: React.FC<DoctorImageUploadModalProps> = ({
     'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1000&q=80'
   );
   const [odFileName, setOdFileName] = useState<string>('od_macula_exam.png');
+  const [odFile, setOdFile] = useState<File | null>(null);
+
   const [osImage, setOsImage] = useState<string>(
     'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1000&q=80'
   );
   const [osFileName, setOsFileName] = useState<string>('os_macula_exam.png');
+  const [osFile, setOsFile] = useState<File | null>(null);
+
+  const [uploadedBackendSession, setUploadedBackendSession] = useState<ScreeningSession | null>(null);
 
   // Step 4: Screening animation
   const [screeningProgress, setScreeningProgress] = useState(0);
@@ -68,9 +74,11 @@ export const DoctorImageUploadModal: React.FC<DoctorImageUploadModalProps> = ({
       if (eye === 'od') {
         setOdImage(url);
         setOdFileName(file.name);
+        setOdFile(file);
       } else {
         setOsImage(url);
         setOsFileName(file.name);
+        setOsFile(file);
       }
     }
   };
@@ -79,6 +87,37 @@ export const DoctorImageUploadModal: React.FC<DoctorImageUploadModalProps> = ({
     setStep('screening');
     setScreeningProgress(15);
     setCurrentAiStep('Evaluating optical field quality & clarity index...');
+
+    // Asynchronously call backend AI stub inference
+    const executeBackendInference = async () => {
+      try {
+        let fileToUpload = odFile || osFile;
+        if (!fileToUpload) {
+          const base64Png =
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+          const byteCharacters = atob(base64Png);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          fileToUpload = new File([byteArray], odFileName || 'od_macula_exam.png', {
+            type: 'image/png',
+          });
+        }
+
+        const realSession = await reportsApi.uploadReport({
+          file: fileToUpload,
+          fileName: fileToUpload.name,
+          patientId: patient.id,
+          laterality: laterality,
+        });
+        setUploadedBackendSession(realSession);
+      } catch (err) {
+        console.warn('Doctor image upload backend notice (fallback active):', err);
+      }
+    };
+    executeBackendInference();
 
     setTimeout(() => {
       setScreeningProgress(35);
@@ -185,7 +224,8 @@ export const DoctorImageUploadModal: React.FC<DoctorImageUploadModalProps> = ({
       },
     };
 
-    onComplete(newSession);
+    const finalSession = uploadedBackendSession || newSession;
+    onComplete(finalSession);
     onClose();
   };
 

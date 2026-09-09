@@ -16,6 +16,13 @@ import {
   initialScreenings,
   initialReferrals,
 } from './mockData';
+import {
+  authApi,
+  reportsApi,
+  transitPassApi,
+  notificationsApi,
+  authStorage,
+} from './services/api';
 import { Header } from './components/common/Header';
 import { NetraAIButton, NetraAIPanel, ScreeningContextData } from './components/NetraAI';
 import { EditProfileModal } from './components/common/EditProfileModal';
@@ -63,7 +70,7 @@ export default function App() {
   // Active Tab per role
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
-  // Domain Data State (dynamically fetched from backend /api/bootstrap)
+  // Domain Data State (dynamically fetched from FastAPI Backend)
   const [doctor, setDoctor] = useState<DoctorUser>(initialDoctor);
   const [worker, setWorker] = useState<WorkerUser>(initialWorker);
   const [patients, setPatients] = useState<PatientProfile[]>(initialPatients);
@@ -114,40 +121,174 @@ export default function App() {
     };
   }, []);
 
-  // Real Dynamic Data Bootstrap from Backend API
+  // Load Live Domain Data from FastAPI Backend based on Role & ID
+  const loadLiveDomainData = async (role: Role, userId: string) => {
+    try {
+      if (role === 'Doctor') {
+        const [reps, passes, pats, notifs] = await Promise.all([
+          reportsApi.getReports().catch(() => []),
+          transitPassApi.getAllTransitPasses().catch(() => []),
+          authApi.getPatients().catch(() => []),
+          notificationsApi.getNotifications(userId).catch(() => []),
+        ]);
+
+        if (reps && reps.length > 0) {
+          setSessions(reps);
+          setSelectedSession(reps[0]);
+        }
+        if (passes && passes.length > 0) setReferrals(passes);
+        if (pats && pats.length > 0) setPatients(pats);
+        if (notifs) setNotifications(notifs);
+
+        setDoctor((prev) => ({
+          ...prev,
+          stats: {
+            totalSessions: reps?.length || prev.stats.totalSessions,
+            reviewed: reps ? reps.filter((r) => r.reviewStatus === 'Reviewed').length : prev.stats.reviewed,
+            referred: passes ? passes.length : prev.stats.referred,
+            pending: reps ? reps.filter((r) => r.reviewStatus === 'Pending Review').length : prev.stats.pending,
+          },
+        }));
+      } else if (role === 'Healthcare Worker') {
+        const [pats, reps, passes, notifs] = await Promise.all([
+          authApi.getPatients().catch(() => []),
+          reportsApi.getReports().catch(() => []),
+          transitPassApi.getAllTransitPasses().catch(() => []),
+          notificationsApi.getNotifications(userId).catch(() => []),
+        ]);
+
+        if (pats && pats.length > 0) setPatients(pats);
+        if (reps && reps.length > 0) {
+          setSessions(reps);
+          setSelectedSession(reps[0]);
+        }
+        if (passes && passes.length > 0) setReferrals(passes);
+        if (notifs) setNotifications(notifs);
+
+        setWorker((prev) => ({
+          ...prev,
+          stats: {
+            patientsRegistered: pats?.length || prev.stats.patientsRegistered,
+            sessionsCompleted: reps?.length || prev.stats.sessionsCompleted,
+            pendingReview: reps ? reps.filter((r) => r.reviewStatus === 'Pending Review').length : prev.stats.pendingReview,
+            urgentFollowUps: passes ? passes.filter((p) => p.urgency === 'Urgent').length : prev.stats.urgentFollowUps,
+          },
+        }));
+      } else if (role === 'Patient') {
+        const [reps, passes] = await Promise.all([
+          reportsApi.getReports({ patient_id: userId }).catch(() => []),
+          transitPassApi.getPatientTransitPasses(userId).catch(() => []),
+        ]);
+
+        if (reps && reps.length > 0) {
+          setSessions(reps);
+          setSelectedSession(reps[0]);
+        }
+        if (passes && passes.length > 0) setReferrals(passes);
+        // User Directive: Notifications completely hidden and empty for Patient
+        setNotifications([]);
+      }
+    } catch (err) {
+      console.warn('Backend live sync notice:', err);
+    }
+  };
+
+  // Check and restore persisted auth session on mount
   useEffect(() => {
-    fetch('/api/bootstrap')
-      .then((res) => {
-        if (!res.ok) throw new Error('API bootstrap failed');
-        return res.json();
-      })
-      .then((data) => {
-        if (data.doctor) setDoctor(data.doctor);
-        if (data.worker) setWorker(data.worker);
-        if (data.patients && Array.isArray(data.patients)) {
-          setPatients(data.patients);
-          if (data.patients.length > 0) setActivePatient(data.patients[0]);
+    const restoreSession = async () => {
+      const token = authStorage.getToken();
+      if (!token) return;
+
+      try {
+        const me = await authApi.getMe();
+        if (me?.user) {
+          const u = me.user;
+          let role: Role = 'Doctor';
+          if (u.role === 'health_worker') role = 'Healthcare Worker';
+          else if (u.role === 'patient') role = 'Patient';
+
+          setCurrentRole(role);
+          setAuthView('authenticated');
+
+          if (role === 'Doctor') {
+            setDoctor((prev) => ({
+              ...prev,
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone || prev.phone,
+              hospital: u.hospital_or_area || prev.hospital,
+            }));
+            setActiveTab('dashboard');
+          } else if (role === 'Healthcare Worker') {
+            setWorker((prev) => ({
+              ...prev,
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone || prev.phone,
+              organization: u.hospital_or_area || prev.organization,
+            }));
+            setActiveTab('home');
+          } else if (role === 'Patient') {
+            setActivePatient((prev) => ({
+              ...prev,
+              id: u.id,
+              name: u.name,
+              phone: u.phone || prev.phone,
+              area: u.hospital_or_area || prev.area,
+            }));
+            setActiveTab('home');
+          }
+
+          await loadLiveDomainData(role, u.id);
         }
-        if (data.sessions && Array.isArray(data.sessions)) {
-          setSessions(data.sessions);
-          if (data.sessions.length > 0) setSelectedSession(data.sessions[0]);
-        }
-        if (data.referrals && Array.isArray(data.referrals)) {
-          setReferrals(data.referrals);
-        }
-        if (data.notifications && Array.isArray(data.notifications)) {
-          setNotifications(data.notifications);
-        }
-      })
-      .catch((err) => {
-        console.warn('Backend sync warning, fallback active:', err);
-      });
+      } catch (err) {
+        console.warn('Persisted session restoration error:', err);
+        authStorage.clear();
+      }
+    };
+
+    restoreSession();
   }, []);
 
   // Handlers for Login
-  const handleLoginSuccess = (role: Role, id: string) => {
+  const handleLoginSuccess = async (role: Role, id: string) => {
     setCurrentRole(role);
     setAuthView('authenticated');
+
+    try {
+      const me = await authApi.getMe();
+      if (me?.user) {
+        const u = me.user;
+        if (role === 'Doctor') {
+          setDoctor((prev) => ({
+            ...prev,
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            hospital: u.hospital_or_area || prev.hospital,
+          }));
+        } else if (role === 'Healthcare Worker') {
+          setWorker((prev) => ({
+            ...prev,
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            organization: u.hospital_or_area || prev.organization,
+          }));
+        } else if (role === 'Patient') {
+          setActivePatient((prev) => ({
+            ...prev,
+            id: u.id,
+            name: u.name,
+            area: u.hospital_or_area || prev.area,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('User details fetch notice:', err);
+    }
 
     if (role === 'Doctor') {
       setActiveTab('dashboard');
@@ -158,23 +299,44 @@ export default function App() {
       setActivePatient(matched);
       setActiveTab('home');
     }
+
+    await loadLiveDomainData(role, id);
+  };
+
+  const handleQuickDemoLogin = async (role: Role, id: string) => {
+    try {
+      if (role === 'Doctor') {
+        await authApi.login('doctor@retinax.org', 'DoctorPass123!');
+      } else if (role === 'Healthcare Worker') {
+        await authApi.login('worker@retinax.org', 'WorkerPass123!');
+      } else if (role === 'Patient') {
+        await authApi.login('patient@retinax.org', 'PatientPass123!');
+      }
+    } catch (err) {
+      console.warn('Quick demo auth notice:', err);
+    }
+    await handleLoginSuccess(role, id);
   };
 
   const handleLogout = () => {
+    authStorage.clear();
     setCurrentRole(null);
     setAuthView('landing');
     setSelectedSession(null);
   };
 
   // Switch Role from header chip (for easy testing between Doctor, Worker, Patient)
-  const handleSwitchRole = (newRole: Role) => {
+  const handleSwitchRole = async (newRole: Role) => {
     setCurrentRole(newRole);
     if (newRole === 'Doctor') {
       setActiveTab('dashboard');
+      await loadLiveDomainData('Doctor', doctor.id);
     } else if (newRole === 'Healthcare Worker') {
       setActiveTab('home');
+      await loadLiveDomainData('Healthcare Worker', worker.id);
     } else if (newRole === 'Patient') {
       setActiveTab('home');
+      await loadLiveDomainData('Patient', activePatient.id);
     }
   };
 
@@ -188,33 +350,27 @@ export default function App() {
   ) => {
     // 1. Send assessment to backend API
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/assessment`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          decision,
-          notes,
-          hospitalName,
-          followUpDate,
-          doctorName: doctor.name,
-          doctorId: doctor.id,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.session) {
-          setSessions((prev) =>
-            prev.map((s) => (s.id === sessionId ? data.session : s))
-          );
-        }
-        if (data.referral) {
-          setReferrals((prev) => [data.referral, ...prev.filter((r) => r.id !== data.referral.id)]);
+      await reportsApi.updateReportStatus(sessionId, 'reviewed', notes);
+
+      // 2. If referred, generate transit pass
+      if (decision === 'Refer to hospital' || decision === 'Urgent referral') {
+        const targetSession = sessions.find((s) => s.id === sessionId);
+        if (targetSession) {
+          await transitPassApi.createTransitPass({
+            patientId: targetSession.patientId,
+            referralReason: notes,
+            targetHospital: hospitalName || 'St. Jude Eye Institute Vitreoretinal Unit',
+            urgency: decision === 'Urgent referral' ? 'Urgent' : 'Routine',
+          });
         }
       }
+
+      await loadLiveDomainData('Doctor', doctor.id);
     } catch (err) {
       console.error('Failed to submit assessment to backend API:', err);
     }
 
+    // Optimistically update local session state
     const updatedSessions = sessions.map((s) => {
       if (s.id === sessionId) {
         return {
@@ -235,59 +391,6 @@ export default function App() {
     });
 
     setSessions(updatedSessions);
-
-    // Update Doctor reviewed stat
-    setDoctor((prev) => ({
-      ...prev,
-      stats: {
-        ...prev.stats,
-        reviewed: prev.stats.reviewed + 1,
-        referred:
-          decision === 'Refer to hospital' || decision === 'Urgent referral'
-            ? prev.stats.referred + 1
-            : prev.stats.referred,
-      },
-    }));
-
-    // If referred, create or update referral record and push notification
-    if (decision === 'Refer to hospital' || decision === 'Urgent referral') {
-      const targetSession = sessions.find((s) => s.id === sessionId);
-      if (targetSession) {
-        const newRef: ReferralItem = {
-          id: `REF-${Math.floor(100 + Math.random() * 900)}`,
-          patientId: targetSession.patientId,
-          patientName: targetSession.patientName,
-          doctorName: doctor.name,
-          doctorId: doctor.id,
-          dateIssued: 'Today',
-          targetAppointmentDate: followUpDate || '2026-09-22',
-          hospitalName: hospitalName || 'St. Jude Eye Institute Vitreoretinal Unit',
-          reason: notes.slice(0, 80) + '...',
-          urgency: decision === 'Urgent referral' ? 'Urgent' : 'Routine',
-          status: 'Referral Issued',
-          timeline: [
-            {
-              status: 'Referral Issued',
-              date: 'Today',
-              note: `Doctor referral generated by ${doctor.name}.`,
-            },
-          ],
-        };
-        setReferrals((prev) => [newRef, ...prev.filter((r) => r.id !== newRef.id)]);
-
-        const newNotif: NotificationItem = {
-          id: `notif-${Date.now()}`,
-          title: `Referral Issued for ${targetSession.patientName}`,
-          message: `Referral issued to ${newRef.hospitalName}. Urgency: ${newRef.urgency}.`,
-          timestamp: 'Just now',
-          isRead: false,
-          type: decision === 'Urgent referral' ? 'high_risk' : 'referral_update',
-          roleTarget: 'Healthcare Worker',
-          patientId: targetSession.patientId,
-        };
-        setNotifications((prev) => [newNotif, ...prev]);
-      }
-    }
   };
 
   // Patient Registration by Worker
@@ -296,19 +399,28 @@ export default function App() {
     startScreeningImmediately: boolean
   ) => {
     try {
-      const res = await fetch('/api/patients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPatient),
+      await authApi.register({
+        name: newPatient.name,
+        email: `${newPatient.id.toLowerCase().replace(/[^a-z0-9]/g, '')}@retinax.org`,
+        password: 'PatientPass123!',
+        role: 'patient',
+        phone: newPatient.phone,
+        hospital_or_area: newPatient.area,
+        custom_id: newPatient.id,
       });
-      if (res.ok) {
-        const saved = await res.json();
-        setPatients((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)]);
+    } catch (err) {
+      console.warn('Patient register backend notice (fallback active):', err);
+    }
+
+    try {
+      const updatedPatients = await authApi.getPatients();
+      if (updatedPatients && updatedPatients.length > 0) {
+        setPatients(updatedPatients);
       } else {
-        setPatients((prev) => [newPatient, ...prev]);
+        setPatients((prev) => [newPatient, ...prev.filter((p) => p.id !== newPatient.id)]);
       }
     } catch {
-      setPatients((prev) => [newPatient, ...prev]);
+      setPatients((prev) => [newPatient, ...prev.filter((p) => p.id !== newPatient.id)]);
     }
 
     setWorker((prev) => ({
@@ -329,61 +441,18 @@ export default function App() {
 
   // Screening Session Completion by Worker
   const handleCompleteScreening = async (newSession: ScreeningSession) => {
-    try {
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSession),
-      });
-      if (res.ok) {
-        const saved = await res.json();
-        setSessions((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
-      } else {
-        setSessions((prev) => [newSession, ...prev]);
-      }
-    } catch {
-      setSessions((prev) => [newSession, ...prev]);
+    setSessions((prev) => [newSession, ...prev.filter((s) => s.id !== newSession.id)]);
+    setSelectedSession(newSession);
+
+    if (currentRole) {
+      await loadLiveDomainData(currentRole, worker.id);
     }
 
-    setWorker((prev) => ({
-      ...prev,
-      stats: {
-        ...prev.stats,
-        sessionsCompleted: prev.stats.sessionsCompleted + 1,
-      },
-    }));
-
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `New Screening: ${newSession.patientName}`,
-      message: `Completed by ${worker.name} (${newSession.laterality} • ${newSession.drGrade}). Queued for doctor review.`,
-      timestamp: 'Just now',
-      isRead: false,
-      type: newSession.riskLevel === 'High Risk' ? 'high_risk' : 'review_needed',
-      roleTarget: 'Doctor',
-      patientId: newSession.patientId,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-
-    // Return to Existing Patient records
     setActiveTab('existing-patient');
   };
 
   // Referral Update by Worker
   const handleUpdateReferral = async (updated: ReferralItem) => {
-    try {
-      await fetch(`/api/referrals/${updated.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: updated.status,
-          note: updated.timeline[updated.timeline.length - 1]?.note,
-        }),
-      });
-    } catch (err) {
-      console.error('Failed to persist referral update:', err);
-    }
-
     setReferrals((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     const notif: NotificationItem = {
       id: `notif-${Date.now()}`,
@@ -400,8 +469,7 @@ export default function App() {
 
   // Notification full-row click navigation handler
   const handleNotificationClick = (item: NotificationItem) => {
-    // 1. Mark as read immediately on frontend and backend
-    fetch(`/api/notifications/${item.id}/toggle`, { method: 'POST' }).catch(() => {});
+    notificationsApi.markAsRead(item.id).catch(() => {});
     setNotifications((prev) =>
       prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
     );
@@ -474,38 +542,22 @@ export default function App() {
     areaOrSpecialization: string;
   }) => {
     if (currentRole === 'Doctor') {
-      const docUpdates = {
+      setDoctor((prev) => ({
+        ...prev,
         name: updated.name,
         email: updated.email,
         phone: updated.phone,
         hospital: updated.organizationOrHospital,
         specialization: updated.areaOrSpecialization,
-      };
-      fetch('/api/doctor', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(docUpdates),
-      }).catch(() => {});
-      setDoctor((prev) => ({
-        ...prev,
-        ...docUpdates,
       }));
     } else if (currentRole === 'Healthcare Worker') {
-      const wrkUpdates = {
+      setWorker((prev) => ({
+        ...prev,
         name: updated.name,
         email: updated.email,
         phone: updated.phone,
         organization: updated.organizationOrHospital,
         area: updated.areaOrSpecialization,
-      };
-      fetch('/api/worker', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(wrkUpdates),
-      }).catch(() => {});
-      setWorker((prev) => ({
-        ...prev,
-        ...wrkUpdates,
       }));
     } else if (currentRole === 'Patient') {
       setActivePatient((prev) => ({
@@ -553,7 +605,7 @@ export default function App() {
             else if (role === 'Patient') setAuthView('login_patient');
           }}
           onQuickDemoLogin={(role, id) => {
-            handleLoginSuccess(role, id);
+            handleQuickDemoLogin(role, id);
           }}
         />
         {renderNetraAI()}
@@ -694,15 +746,15 @@ export default function App() {
               currentRole={currentRole}
               notifications={notifications}
               onMarkAllAsRead={() => {
-                fetch('/api/notifications/mark-all-read', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ roleTarget: currentRole || undefined }),
-                }).catch(() => {});
+                notifications
+                  .filter((n) => !n.isRead)
+                  .forEach((n) => {
+                    notificationsApi.markAsRead(n.id).catch(() => {});
+                  });
                 setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
               }}
               onToggleRead={(id) => {
-                fetch(`/api/notifications/${id}/toggle`, { method: 'POST' }).catch(() => {});
+                notificationsApi.markAsRead(id).catch(() => {});
                 setNotifications((prev) =>
                   prev.map((n) => (n.id === id ? { ...n, isRead: !n.isRead } : n))
                 );

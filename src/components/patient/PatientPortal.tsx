@@ -119,8 +119,8 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
         </div>
       </div>
 
-      {/* 4 Summary Cards: Latest Screening, Last Screening Date, Total Screenings, Notifications */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* 3 Summary Cards: Latest Screening, Last Screening Date, Total Screenings */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Latest Screening */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
@@ -186,37 +186,6 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
           </div>
           <div className="pt-3 border-t border-gray-100 mt-3 text-xs text-emerald-700 font-semibold">
             {patientSessions.length > 0 ? 'All images archived safely' : 'No records yet'}
-          </div>
-        </div>
-
-        {/* Card 4: Notifications */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              Notifications
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-              <Bell className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-gray-950 mb-1">
-              {patientNotifications.length}
-            </div>
-            <p className="text-xs text-gray-500">Doctor review updates</p>
-          </div>
-          <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-xs text-teal-800 font-semibold">
-            {onNavigateTab ? (
-              <button
-                onClick={() => onNavigateTab('notifications')}
-                className="hover:underline flex items-center gap-1"
-              >
-                <span>View alerts</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            ) : (
-              <span>All up to date</span>
-            )}
           </div>
         </div>
       </div>
@@ -484,59 +453,6 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {activeTab === 'home' && renderHome()}
       {activeTab === 'history' && renderHistory()}
-      {activeTab === 'notifications' && (
-        <div className="max-w-4xl mx-auto">
-          <SectionHeader
-            heading="My Health Notifications"
-            quote="What updates are available for my eye care?"
-            description="Timely notices regarding new screening results, hospital appointment recommendations, and preventive advice."
-          />
-          <div className="space-y-3 mt-6">
-            {patientNotifications.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-xs">
-                <Bell className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-sm font-bold text-gray-900 mb-1">No notifications yet</h3>
-                <p className="text-xs text-gray-500">
-                  You have no pending clinical alerts or appointment notices.
-                </p>
-              </div>
-            ) : (
-              patientNotifications.map((notif) => {
-                const isReferral = notif.type === 'referral_update';
-                return (
-                  <div
-                    key={notif.id}
-                    className={`bg-white rounded-2xl border p-5 shadow-xs ${
-                      isReferral ? 'border-amber-200' : 'border-teal-200'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isReferral
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-teal-50 text-teal-700 border-teal-200'
-                        }`}
-                      >
-                        {isReferral ? <Building2 className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-950">
-                          {notif.title}
-                        </h4>
-                        <p className="text-xs text-gray-600 mt-1">
-                          {notif.message}
-                        </p>
-                        <span className="text-[11px] text-gray-400 mt-2 block">{notif.timestamp}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
       {activeTab === 'profile' && (
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
