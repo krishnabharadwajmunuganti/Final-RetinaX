@@ -37,14 +37,14 @@ export const RetinalVisualizer: React.FC<RetinalVisualizerProps> = ({
   const [overlayOpacity, setOverlayOpacity] = useState<number>(0.85);
   const [showAnatomicalLabels, setShowAnatomicalLabels] = useState<boolean>(true);
 
-  const tabs: { id: VisualizationTab; label: string; count?: number | string }[] = [
+  const tabs: { id: VisualizationTab; label: string; count?: number | string; inDevelopment?: boolean }[] = [
     { id: 'Original', label: 'Original' },
-    { id: 'DR Explanation', label: 'DR Explanation (Grad-CAM)' },
-    { id: 'Microaneurysm', label: 'Microaneurysms', count: hasMicroaneurysms ? '24' : '0' },
-    { id: 'Hemorrhage', label: 'Hemorrhages', count: hasHemorrhages ? '18' : '0' },
-    { id: 'Exudate', label: 'Exudates', count: hasExudates ? 'Ring' : '0' },
-    { id: 'Optic Disc', label: 'Optic Disc' },
-    { id: 'Vessels', label: 'Vessels' },
+    { id: 'DR Explanation', label: 'DR Explanation (Grad-CAM)', inDevelopment: true },
+    { id: 'Microaneurysm', label: 'Microaneurysms', inDevelopment: true },
+    { id: 'Hemorrhage', label: 'Hemorrhages', inDevelopment: true },
+    { id: 'Exudate', label: 'Exudates', count: hasExudates ? 'Live ONNX' : '0' },
+    { id: 'Optic Disc', label: 'Optic Disc', count: 'Live ONNX' },
+    { id: 'Vessels', label: 'Vessels', count: 'Live ONNX' },
   ];
 
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 0.25, 2.5));
@@ -87,7 +87,16 @@ export const RetinalVisualizer: React.FC<RetinalVisualizerProps> = ({
                 }`}
               >
                 <span>{tab.label}</span>
-                {tab.count !== undefined && (
+                {tab.inDevelopment && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      isActive ? 'bg-indigo-900 text-indigo-100 border border-indigo-400' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    }`}
+                  >
+                    Coming Soon
+                  </span>
+                )}
+                {tab.count !== undefined && !tab.inDevelopment && (
                   <span
                     className={`px-1.5 py-0.2 rounded-full text-[10px] ${
                       isActive ? 'bg-teal-800 text-teal-100' : 'bg-gray-100 text-gray-600'
@@ -252,135 +261,10 @@ export const RetinalVisualizer: React.FC<RetinalVisualizerProps> = ({
             />
 
             {/* ========================================================
-                DERIVED VISUALIZATION OVERLAYS (Shown conditionally)
+                DERIVED VISUALIZATION OVERLAYS (Trained ONNX Models)
+                Note: Grad-CAM, Microaneurysms, and Hemorrhages are
+                strictly not simulated and marked in-development.
                ======================================================== */}
-
-            {/* 1. DR Explanation: Grad-CAM Saliency Map */}
-            {activeTab === 'DR Explanation' && (
-              <g opacity={overlayOpacity} className="animate-in fade-in">
-                {/* Hotspot 1: Macula lesion cluster */}
-                <circle cx="280" cy="245" r="95" fill="url(#gradCamHotspot1)" />
-                {/* Hotspot 2: Superior Temporal Arcade */}
-                <circle cx="340" cy="160" r="70" fill="url(#gradCamHotspot2)" />
-                {/* Hotspot 3: Inferior blot hemorrhages */}
-                <circle cx="290" cy="340" r="60" fill="url(#gradCamHotspot2)" />
-
-                {/* Saliency Contours */}
-                <circle
-                  cx="280"
-                  cy="245"
-                  r="60"
-                  stroke="#ffff00"
-                  strokeWidth="1.5"
-                  strokeDasharray="4,3"
-                  fill="none"
-                  opacity="0.8"
-                />
-                <circle
-                  cx="280"
-                  cy="245"
-                  r="35"
-                  stroke="#ff0000"
-                  strokeWidth="2"
-                  strokeDasharray="3,2"
-                  fill="none"
-                  opacity="0.9"
-                />
-              </g>
-            )}
-
-            {/* 2. Microaneurysm Overlay */}
-            {activeTab === 'Microaneurysm' && (
-              <g opacity={overlayOpacity} className="animate-in zoom-in-95">
-                {[
-                  { cx: 245, cy: 230, r: 4 },
-                  { cx: 255, cy: 220, r: 3.5 },
-                  { cx: 285, cy: 225, r: 4.2 },
-                  { cx: 295, cy: 235, r: 3.8 },
-                  { cx: 265, cy: 275, r: 4 },
-                  { cx: 280, cy: 285, r: 3.5 },
-                  { cx: 310, cy: 250, r: 4.5 },
-                  { cx: 325, cy: 230, r: 3.5 },
-                  { cx: 235, cy: 260, r: 3.8 },
-                  { cx: 330, cy: 195, r: 4.2 },
-                  { cx: 350, cy: 175, r: 4 },
-                  { cx: 260, cy: 185, r: 3.5 },
-                  { cx: 275, cy: 320, r: 4 },
-                  { cx: 300, cy: 335, r: 3.8 },
-                ].map((m, idx) => (
-                  <g key={idx}>
-                    {/* Ring highlight */}
-                    <circle
-                      cx={m.cx}
-                      cy={m.cy}
-                      r={m.r + 7}
-                      stroke="#ef4444"
-                      strokeWidth="1.5"
-                      fill="rgba(239, 68, 68, 0.2)"
-                    />
-                    {/* Lesion Dot */}
-                    <circle cx={m.cx} cy={m.cy} r={m.r} fill="#dc2626" />
-                  </g>
-                ))}
-              </g>
-            )}
-
-            {/* 3. Hemorrhage Overlay */}
-            {activeTab === 'Hemorrhage' && (
-              <g opacity={overlayOpacity} className="animate-in zoom-in-95">
-                {/* Deep Blot Hemorrhages */}
-                <ellipse
-                  cx="320"
-                  cy="200"
-                  rx="14"
-                  ry="9"
-                  fill="#7f1d1d"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                />
-                <ellipse
-                  cx="360"
-                  cy="170"
-                  rx="18"
-                  ry="12"
-                  fill="#7f1d1d"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                />
-                <ellipse
-                  cx="285"
-                  cy="330"
-                  rx="16"
-                  ry="10"
-                  fill="#7f1d1d"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                />
-                <ellipse
-                  cx="220"
-                  cy="310"
-                  rx="12"
-                  ry="8"
-                  fill="#7f1d1d"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                />
-
-                {/* Flame-shaped Superficially Streaked Hemorrhages */}
-                <path
-                  d="M 340 140 Q 370 150, 390 145 Q 365 135, 340 140"
-                  fill="#991b1b"
-                  stroke="#f87171"
-                  strokeWidth="1"
-                />
-                <path
-                  d="M 300 350 Q 330 365, 350 360 Q 320 348, 300 350"
-                  fill="#991b1b"
-                  stroke="#f87171"
-                  strokeWidth="1"
-                />
-              </g>
-            )}
 
             {/* 4. Exudate Overlay */}
             {activeTab === 'Exudate' && (
@@ -514,6 +398,32 @@ export const RetinalVisualizer: React.FC<RetinalVisualizerProps> = ({
               </div>
             </div>
           )}
+          {/* In-Development Notice Overlay for non-implemented models & Grad-CAM */}
+          {(activeTab === 'DR Explanation' || activeTab === 'Microaneurysm' || activeTab === 'Hemorrhage') && (
+            <div className="absolute inset-0 flex items-center justify-center p-6 bg-black/65 backdrop-blur-xs z-20 animate-in fade-in">
+              <div className="bg-white rounded-2xl p-6 max-w-sm text-center space-y-3 shadow-2xl border border-indigo-200">
+                <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+                  <Info className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-gray-950">
+                  {activeTab === 'DR Explanation'
+                    ? 'Grad-CAM Attention Saliency'
+                    : `${activeTab} Detection`}
+                </h4>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  {activeTab === 'DR Explanation'
+                    ? 'Grad-CAM backprop gradient extraction (dY/dA) is not supported in forward-only ONNX Runtime. Attention visualization is pending autograd model export.'
+                    : `${activeTab} detection model is currently in development. RetinaX does not simulate, fake, or hardcode unprovided outputs.`}
+                </p>
+                <div className="pt-1">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                    Status: not_yet_implemented (Coming Soon)
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Floating Controls Overlay (Zoom, Opacity, Info) */}
@@ -546,8 +456,8 @@ export const RetinalVisualizer: React.FC<RetinalVisualizerProps> = ({
             </button>
           </div>
 
-          {/* Overlay Opacity Slider (When activeTab is not Original) */}
-          {activeTab !== 'Original' && (
+          {/* Overlay Opacity Slider (When activeTab is not Original and not in dev) */}
+          {activeTab !== 'Original' && activeTab !== 'DR Explanation' && activeTab !== 'Microaneurysm' && activeTab !== 'Hemorrhage' && (
             <div className="hidden sm:flex items-center gap-2 bg-black/70 backdrop-blur-md rounded-xl px-3 py-1.5 border border-white/10 text-white shadow-lg">
               <Sliders className="w-3.5 h-3.5 text-teal-400" />
               <span className="text-xs font-medium">Overlay:</span>
@@ -577,25 +487,25 @@ export const RetinalVisualizer: React.FC<RetinalVisualizerProps> = ({
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-teal-700 shrink-0" />
           {activeTab === 'Original' && (
-            <span>Raw untouched 45° fundus image. Preserved permanently for medico-legal record integrity.</span>
+            <span>Raw untouched 45° fundus photograph. Preserved permanently for medico-legal record integrity.</span>
           )}
           {activeTab === 'DR Explanation' && (
-            <span>Grad-CAM model saliency map: Highlights retinal regions contributing highest activation to DR classification.</span>
+            <span>Grad-CAM Attention Saliency: <strong>Model in Development</strong> (Status: <em>not_yet_implemented</em>). Backprop activation gradient mapping not feasible with ONNX Runtime alone.</span>
           )}
           {activeTab === 'Microaneurysm' && (
-            <span>Detected 24 focal capillary wall outpouchings (25-40μm diameter) concentrated in the temporal vascular arcade.</span>
+            <span>Microaneurysm Detection: <strong>Model in Development</strong> (Status: <em>not_yet_implemented</em>). Coming Soon upon model deployment. No simulated lesions are displayed.</span>
           )}
           {activeTab === 'Hemorrhage' && (
-            <span>18 intraretinal flame and deep blot hemorrhages detected across 4 quadrants meeting ICDR severe criteria.</span>
+            <span>Hemorrhage Classification: <strong>Model in Development</strong> (Status: <em>not_yet_implemented</em>). Coming Soon upon model deployment. No simulated lesions are displayed.</span>
           )}
           {activeTab === 'Exudate' && (
-            <span>Lipid circinate ring identified within 500μm of macular avascular zone (high macular edema risk).</span>
+            <span>Hard Exudates (Live ONNX): Trained best_exudate_model_FINAL segmenting hard lipid deposits and perimacular leakage.</span>
           )}
           {activeTab === 'Optic Disc' && (
-            <span>Optic disc segmentation: Cup-to-Disc Ratio calculated at 0.35 (vertical). Neuroretinal rim healthy pink.</span>
+            <span>Optic Disc (Live ONNX): Trained RETINAX_OPTIC_DISC_MATLAB segmenting neuroretinal rim and cup boundaries.</span>
           )}
           {activeTab === 'Vessels' && (
-            <span>Arteriolar narrowing detected (AV ratio 0.52). Arteriovenous nicking site highlighted at superior branch.</span>
+            <span>Retinal Vessels (Live ONNX): Trained RETINAX_VESSEL_MATLAB segmenting arteriolar and venular tree geometry.</span>
           )}
         </div>
 

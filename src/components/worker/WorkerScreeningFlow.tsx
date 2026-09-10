@@ -923,6 +923,25 @@ export const WorkerScreeningFlow: React.FC<WorkerScreeningFlowProps> = ({
             </div>
           )}
 
+          {/* Quality Rejection Warning Banner if rejected */}
+          {uploadedBackendSession?.aiReport?.status === 'rejected_poor_quality' && (
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs">
+                <p className="font-bold text-sm text-amber-950">
+                  Scan Rejected by IQA Triage — Recapture Required
+                </p>
+                <p>
+                  {uploadedBackendSession.aiReport.iqa.feedback ||
+                    'Image quality insufficient for clinical grading. Please recapture with proper focus and flash illumination.'}
+                </p>
+                <p className="font-semibold text-amber-800 pt-1">
+                  Click "Go Back" to upload a sharper, evenly illuminated scan.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Simplified Result Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 1. Overall Risk */}
@@ -930,17 +949,29 @@ export const WorkerScreeningFlow: React.FC<WorkerScreeningFlowProps> = ({
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
                 1. Overall Risk Level
               </span>
-              <div className="text-xl font-bold text-amber-950">Referable</div>
+              <div className="text-xl font-bold text-amber-950">
+                {uploadedBackendSession?.riskLevel || 'Referable'}
+              </div>
               <p className="text-[11px] text-gray-600">Requires ophthalmologist confirmation</p>
             </div>
 
             {/* 2. Image Quality */}
-            <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-1">
+            <div className={`p-4 rounded-2xl space-y-1 ${
+              uploadedBackendSession?.aiReport?.status === 'rejected_poor_quality'
+                ? 'bg-rose-50/60 border border-rose-200'
+                : 'bg-emerald-50/60 border border-emerald-200'
+            }`}>
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
                 2. Image Quality
               </span>
-              <div className="text-xl font-bold text-emerald-950">Good (Pass)</div>
-              <p className="text-[11px] text-gray-600">Sharp fovea and clear vessels</p>
+              <div className="text-xl font-bold text-gray-950">
+                {uploadedBackendSession?.imageQuality || 'Good (Pass)'}
+              </div>
+              <p className="text-[11px] text-gray-600">
+                {uploadedBackendSession?.aiReport?.status === 'rejected_poor_quality'
+                  ? 'Ungradeable (Recapture required)'
+                  : 'Sharp fovea and clear vessels'}
+              </p>
             </div>
 
             {/* 3. DR Classification Result */}
@@ -949,9 +980,13 @@ export const WorkerScreeningFlow: React.FC<WorkerScreeningFlowProps> = ({
                 3. DR Staging Result
               </span>
               <div className="text-xl font-bold text-rose-950">
-                {activeOuTab === 'OD' ? 'Moderate NPDR' : 'Mild NPDR'}
+                {uploadedBackendSession?.drGrade || (activeOuTab === 'OD' ? 'Moderate NPDR' : 'Mild NPDR')}
               </div>
-              <p className="text-[11px] text-gray-600">Microaneurysms detected</p>
+              <p className="text-[11px] text-gray-600">
+                {uploadedBackendSession?.aiReport?.status === 'rejected_poor_quality'
+                  ? 'Grading halted'
+                  : 'Live ONNX DR Model'}
+              </p>
             </div>
 
             {/* 4. Referable (Yes/No) */}
@@ -959,8 +994,12 @@ export const WorkerScreeningFlow: React.FC<WorkerScreeningFlowProps> = ({
               <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800">
                 4. Referable DR
               </span>
-              <div className="text-xl font-bold text-teal-950">Yes</div>
-              <p className="text-[11px] text-gray-600">Hospital referral recommended</p>
+              <div className="text-xl font-bold text-teal-950">
+                {uploadedBackendSession ? (uploadedBackendSession.isReferable ? 'Yes' : 'No') : 'Yes'}
+              </div>
+              <p className="text-[11px] text-gray-600">
+                {uploadedBackendSession?.isReferable ? 'Hospital referral recommended' : 'Community follow-up'}
+              </p>
             </div>
           </div>
 

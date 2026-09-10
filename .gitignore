@@ -6,3 +6,28 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Local databases & uploads
+retinax.db
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
+backend/uploads/*.png
+backend/uploads/*.webp
+backend/uploads/masks/*.png
+!backend/uploads/.gitkeep
+!backend/uploads/masks/.gitkeep
+
+# Testing & deployment caches
+.pytest_cache/
+.vercel
+

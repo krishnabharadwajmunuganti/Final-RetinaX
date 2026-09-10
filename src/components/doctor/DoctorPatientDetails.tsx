@@ -165,13 +165,13 @@ export const DoctorPatientDetails: React.FC<DoctorPatientDetailsProps> = ({
                         confidence: session.aiReport.drClassification.confidence,
                         quality: session.aiReport.iqa.status,
                         lesions: [
-                          session.aiReport.microaneurysms.detected
-                            ? `Microaneurysms (${session.aiReport.microaneurysms.count})`
+                          session.aiReport?.exudates?.detected
+                            ? `Hard exudates (${session.aiReport.exudates.pixelCount || 0} px)`
                             : null,
-                          session.aiReport.hemorrhages.detected ? 'Hemorrhages' : null,
-                          session.aiReport.exudates.detected ? 'Hard exudates' : null,
+                          session.aiReport?.opticDisc?.detected ? 'Optic disc localized' : null,
+                          session.aiReport?.vesselAnalysis?.detected ? 'Vessels segmented' : null,
                         ].filter(Boolean) as string[],
-                        gradCamAvailable: true,
+                        gradCamAvailable: false,
                       },
                       referralStatus: session.isReferable ? 'Referable DR' : 'Non-referable',
                       doctorReviewStatus: session.reviewStatus,
@@ -181,7 +181,9 @@ export const DoctorPatientDetails: React.FC<DoctorPatientDetailsProps> = ({
                       new CustomEvent('open-netra-ai', {
                         detail: {
                           context,
-                          prompt: 'Explain this screening result in simple terms.',
+                          prompt: session.aiReport?.status === 'rejected_poor_quality'
+                            ? 'Explain why this scan was rejected for poor image quality.'
+                            : 'Explain this screening result in simple terms.',
                         },
                       })
                     );
@@ -234,13 +236,15 @@ export const DoctorPatientDetails: React.FC<DoctorPatientDetailsProps> = ({
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/60 p-3 rounded-xl border border-gray-100">
-              <strong>Automated Clinical Note:</strong> Patient presents with {session.drGrade}. AI confidence is {session.aiReport.drClassification.confidence}%. Microaneurysms: {session.aiReport.microaneurysms.count} lesions detected. Macular hard exudate ring identified near foveal perimeter.
+              <strong>Automated Clinical Note:</strong>{' '}
+              {session.aiReport?.clinicalSummary ||
+                `Patient presents with ${session.drGrade}. AI confidence: ${session.aiReport?.drClassification?.confidence || 0}%. Multi-model screening assessment completed.`}
             </p>
           </div>
 
           <div className="mt-3 flex items-center gap-2 text-xs text-teal-800">
             <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
-            <span>Fused by 8 deep clinical models with verified sensitivity & specificity.</span>
+            <span>Fused by 5 trained ONNX models (IQA, Optic Disc, Vessels, Exudates, DR Grading).</span>
           </div>
         </div>
       </div>
@@ -248,11 +252,14 @@ export const DoctorPatientDetails: React.FC<DoctorPatientDetailsProps> = ({
       {/* 3. Original Retinal Image & Visualization Tabs */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-          <SectionHeader
-            heading="Retinal Fundus Image & AI Derived Visualizations"
-            quote="What does the retinal anatomy reveal?"
-            description="The original retinal image is preserved unchanged. Select derived tabs to inspect Grad-CAM activations, microaneurysm points, hemorrhages, and vascular geometry."
-          />
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">
+              Retinal Fundus Image Examination
+            </h3>
+            <p className="text-xs text-gray-500">
+              Original retinal scan preserved permanently. Derived tabs show live optic disc, vessel, and exudate segmentations.
+            </p>
+          </div>
 
           <button
             id="doctor-upload-retinal-image-btn"
@@ -271,9 +278,9 @@ export const DoctorPatientDetails: React.FC<DoctorPatientDetailsProps> = ({
           laterality={session.laterality}
           drGrade={session.drGrade}
           quality={session.imageQuality}
-          hasExudates={session.aiReport.exudates.detected}
-          hasHemorrhages={session.aiReport.hemorrhages.detected}
-          hasMicroaneurysms={session.aiReport.microaneurysms.detected}
+          hasExudates={Boolean(session.aiReport?.exudates?.detected)}
+          hasHemorrhages={Boolean(session.aiReport?.hemorrhages?.detected)}
+          hasMicroaneurysms={Boolean(session.aiReport?.microaneurysms?.detected)}
         />
 
         {/* Doctor Retinal Image Capture Modal */}

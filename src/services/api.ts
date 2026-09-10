@@ -271,27 +271,33 @@ export function adaptReportToSession(report: any): ScreeningSession {
     moderate: 'Referable',
     mild: 'Needs Review',
     none: 'Low Risk',
+    ungradeable: 'Needs Review',
   };
 
-  const statusMap: Record<string, 'Pending Review' | 'Reviewed' | 'Referred' | 'Follow-up Set'> = {
+  const statusMap: Record<string, 'Pending Review' | 'Reviewed' | 'Referred' | 'Follow-up Set' | 'Recapture Needed' | 'Rejected (Quality)'> = {
     pending: 'Pending Review',
     reviewed: 'Reviewed',
     accepted: 'Reviewed',
+    rejected_poor_quality: 'Recapture Needed',
   };
 
   // Build complete AIModelReport structure
   const fullAiReport: AIModelReport = {
+    status: diag.status || (report.status === 'rejected_poor_quality' ? 'rejected_poor_quality' : 'active'),
     iqa: {
       status: (iqa.status as any) || 'Good',
       score: iqa.score || 94,
       sharpness: iqa.sharpness || 'Sharp foveal detail',
       illumination: iqa.illumination || 'Uniformly illuminated',
       fieldOfView: iqa.fieldOfView || 'Field 2 (Macula Centered)',
+      feedback: iqa.feedback,
+      isAcceptable: iqa.isAcceptable ?? (report.status !== 'rejected_poor_quality'),
     },
     drClassification: {
       grade: (drClass.grade as any) || 'Moderate NPDR',
       confidence: drClass.confidence || 94,
       icdrScale: drClass.icdrScale ?? 2,
+      probabilities: drClass.probabilities,
     },
     referableDR: {
       isReferable: diag.referableDR?.isReferable ?? (report.severity === 'moderate' || report.severity === 'severe' || report.severity === 'proliferative'),
@@ -299,35 +305,62 @@ export function adaptReportToSession(report: any): ScreeningSession {
       criteria: diag.referableDR?.criteria || 'Referable retinopathy lesions identified.',
     },
     microaneurysms: diag.microaneurysms || {
-      detected: report.severity !== 'none',
-      count: report.severity === 'none' ? 0 : 8,
-      quadrants: ['Temporal'],
-      details: 'Punctate microaneurysms near macula',
+      status: 'not_yet_implemented',
+      detected: null,
+      count: null,
+      quadrants: [],
+      details: 'Microaneurysm detection model is in development (Coming Soon)',
     },
     hemorrhages: diag.hemorrhages || {
-      detected: report.severity === 'moderate' || report.severity === 'severe' || report.severity === 'proliferative',
-      type: 'Dot-blot',
-      quadrants: ['Temporal'],
-      details: 'Intraretinal blot hemorrhages',
+      status: 'not_yet_implemented',
+      detected: null,
+      type: null,
+      quadrants: [],
+      details: 'Hemorrhage classification model is in development (Coming Soon)',
+    },
+    neovascularization: diag.neovascularization || {
+      status: 'not_yet_implemented',
+      detected: null,
+      details: 'Neovascularization detection model is in development (Coming Soon)',
     },
     exudates: diag.exudates || {
-      detected: report.severity === 'moderate' || report.severity === 'severe' || report.severity === 'proliferative',
-      pattern: 'Hard lipid rings',
-      macularInvolvement: report.severity === 'severe' || report.severity === 'proliferative',
-      details: 'Circinate lipid deposits',
+      status: 'active',
+      detected: false,
+      pixelCount: 0,
+      pattern: 'None',
+      macularInvolvement: false,
+      details: 'No clinically evident hard lipid exudation detected.',
     },
     opticDisc: diag.opticDisc || {
       status: 'Normal',
+      detected: true,
       cupToDiscRatio: 0.34,
       marginClarity: 'Distinct margins',
       details: 'Healthy neuroretinal rim tissue without glaucomatous cupping.',
     },
     vesselAnalysis: diag.vesselAnalysis || {
-      status: report.severity === 'none' || report.severity === 'mild' ? 'Normal' : 'Abnormal',
+      status: 'Normal',
+      detected: true,
       tortuosity: 'Mild',
-      caliberRatio: '0.68',
-      arteriovenousNicking: report.severity === 'severe' || report.severity === 'proliferative',
+      caliberRatio: '2:3 (normal limits)',
+      arteriovenousNicking: false,
       details: 'Arteriovenous caliber within normal limits.',
+    },
+    gradCam: diag.gradCam || {
+      status: 'not_yet_implemented',
+      available: false,
+      overlayUrl: null,
+      details: 'Grad-CAM backprop gradient extraction not supported in ONNX Runtime. Model in development.',
+    },
+    clinicalSummary: diag.clinicalSummary || 'Automated multi-model diabetic retinopathy screening assessment.',
+    visualizations: diag.visualizations || {
+      original: report.image_url,
+      opticDisc: null,
+      vessels: null,
+      exudates: null,
+      microaneurysms: null,
+      hemorrhages: null,
+      gradCam: null,
     },
   };
 

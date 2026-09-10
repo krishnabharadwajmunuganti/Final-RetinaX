@@ -46,6 +46,9 @@ class Settings:
     # Server Base URL for serving uploaded image URLs
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
+    # Netra AI Chatbot LLM API Key (Loaded from environment only)
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+
     # CORS configuration - strict explicit list, NO WILDCARDS to support allow_credentials=True
     _raw_origins = os.getenv(
         "CORS_ORIGINS",

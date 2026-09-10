@@ -10,6 +10,7 @@ from backend.routes.auth import router as auth_router
 from backend.routes.reports import router as reports_router
 from backend.routes.notifications import router as notifications_router
 from backend.routes.transit_pass import router as transit_pass_router
+from backend.routes.chatbot import router as chatbot_router
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ app.include_router(auth_router)
 app.include_router(reports_router)
 app.include_router(notifications_router)
 app.include_router(transit_pass_router)
+app.include_router(chatbot_router)
 
 
 # 4. Health Check Endpoints
@@ -50,7 +52,22 @@ def health_check():
         "service": "RetinaX Tele-Ophthalmology Backend API",
         "version": settings.VERSION,
         "database": "Supabase PostgreSQL / Local SQLite",
-        "ai_model": "DR Clinical Diagnostic Engine (Active Stub)",
+        "ai_pipeline": {
+            "status": "active",
+            "live_models": [
+                "RETINAX_IQA_FINAL.onnx (Image Quality Assessment)",
+                "RETINAX_OPTIC_DISC_MATLAB.onnx (Optic Disc Localization)",
+                "RETINAX_VESSEL_MATLAB.onnx (Vessel Segmentation)",
+                "best_exudate_model_FINAL.onnx (Exudate Segmentation)",
+                "RETINAX_DR_FINAL.onnx (DR Severity Grading 0-4)",
+            ],
+            "pending_models": [
+                "microaneurysms (not_yet_implemented)",
+                "hemorrhages (not_yet_implemented)",
+                "neovascularization (not_yet_implemented)",
+                "grad_cam (not_yet_implemented - backprop gradient extraction not supported in ONNX Runtime forward inference)",
+            ],
+        },
         "timestamp": datetime.utcnow().isoformat(),
     }
 
@@ -66,6 +83,7 @@ def root():
             "reports": ["POST /reports/upload", "GET /reports/:id", "PUT /reports/:id/status", "GET /reports"],
             "notifications": ["GET /notifications/:userId", "PUT /notifications/:id/read"],
             "transit_pass": ["POST /transit-pass/refer", "GET /transit-pass/:patientId", "GET /transit-pass"],
+            "chatbot": ["POST /chatbot/ask", "POST /api/chatbot/ask"],
         },
     }
 

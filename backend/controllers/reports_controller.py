@@ -140,7 +140,9 @@ def upload_and_process_report(
             detail=f"AI diagnostic inference failed: {str(e)}",
         )
 
+    is_rejected = ai_result.get("status") == "rejected_poor_quality"
     severity = ai_result.get("severity", "none")
+    report_status = "rejected_poor_quality" if is_rejected else "pending"
 
     # Create Report DB record
     new_report = Report(
@@ -148,7 +150,7 @@ def upload_and_process_report(
         image_url=image_url,
         laterality=laterality or "Right Eye (OD)",
         severity=severity,
-        status="pending",
+        status=report_status,
     )
     new_report.ai_diagnosis = ai_result
 
@@ -157,26 +159,37 @@ def upload_and_process_report(
     db.refresh(new_report)
 
     # Generate Notifications
-    # 1. Notification for the patient
-    patient_notif = Notification(
-        user_id=patient_id,
-        message=f"New retinal scan uploaded ({laterality}). Preliminary AI assessment: {ai_result.get('drClassification', {}).get('grade', 'Analyzed')}. Queued for doctor review.",
-        type="review_needed",
-        related_report_id=new_report.id,
-    )
-    db.add(patient_notif)
+    if is_rejected:
+        # Quality recapture notification
+        feedback_msg = ai_result.get("iqa", {}).get("feedback", "Image recapture required.")
+        patient_notif = Notification(
+            user_id=patient_id,
+            message=f"Retinal scan ({laterality}) rejected due to poor image quality: {feedback_msg}",
+            type="recapture_needed",
+            related_report_id=new_report.id,
+        )
+        db.add(patient_notif)
+    else:
+        # 1. Notification for the patient
+        patient_notif = Notification(
+            user_id=patient_id,
+            message=f"New retinal scan uploaded ({laterality}). Preliminary AI assessment: {ai_result.get('drClassification', {}).get('grade', 'Analyzed')}. Queued for doctor review.",
+            type="review_needed",
+            related_report_id=new_report.id,
+        )
+        db.add(patient_notif)
 
-    # 2. If high risk, notify all doctors
-    if severity in ["moderate", "severe", "proliferative"]:
-        doctors = db.query(User).filter(User.role == "doctor").all()
-        for doc in doctors:
-            doc_notif = Notification(
-                user_id=doc.id,
-                message=f"URGENT: {ai_result.get('drClassification', {}).get('grade', 'High Risk')} detected for patient {target_patient.name} ({target_patient.id}). Review required.",
-                type="high_risk",
-                related_report_id=new_report.id,
-            )
-            db.add(doc_notif)
+        # 2. If high risk, notify all doctors
+        if severity in ["moderate", "severe", "proliferative"]:
+            doctors = db.query(User).filter(User.role == "doctor").all()
+            for doc in doctors:
+                doc_notif = Notification(
+                    user_id=doc.id,
+                    message=f"URGENT: {ai_result.get('drClassification', {}).get('grade', 'High Risk')} detected for patient {target_patient.name} ({target_patient.id}). Review required.",
+                    type="high_risk",
+                    related_report_id=new_report.id,
+                )
+                db.add(doc_notif)
 
     db.commit()
     return new_report.to_dict()

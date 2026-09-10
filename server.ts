@@ -154,15 +154,15 @@ app.put("/api/worker", (req, res) => {
   res.json(dataStore.updateWorker(req.body));
 });
 
-// Netra AI Assistant endpoints (POST /api/assistant/chat and POST /api/assistant)
-app.post("/api/assistant/chat", async (req, res) => {
+// Netra AI Assistant endpoints (POST /api/assistant/chat, POST /chatbot/ask, and POST /api/assistant)
+app.post(["/api/assistant/chat", "/chatbot/ask", "/api/chatbot/ask"], async (req, res) => {
   try {
-    const { message, userRole, screeningContext, conversationHistory } = req.body;
+    const { message, userRole, screeningContext, conversationHistory, context, history } = req.body;
     const response = await handleNetraChat({
       message,
-      userRole,
-      screeningContext,
-      conversationHistory,
+      userRole: userRole || req.body.role,
+      screeningContext: screeningContext || context,
+      conversationHistory: conversationHistory || history,
     });
     if (response.error && response.reply === "Please enter a question.") {
       res.status(400).json(response);

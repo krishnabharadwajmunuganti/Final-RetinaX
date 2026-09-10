@@ -2,11 +2,11 @@ export type Role = 'Doctor' | 'Healthcare Worker' | 'Patient';
 
 export type RiskLevel = 'High Risk' | 'Referable' | 'Needs Review' | 'Low Risk' | 'All Patients' | 'Recent Screenings';
 
-export type DRGrade = 'No DR' | 'Mild NPDR' | 'Moderate NPDR' | 'Severe NPDR' | 'Proliferative DR (PDR)';
+export type DRGrade = 'No DR' | 'Mild NPDR' | 'Moderate NPDR' | 'Severe NPDR' | 'Proliferative DR (PDR)' | 'Ungradeable' | string;
 
-export type ImageQuality = 'Good' | 'Acceptable' | 'Poor';
+export type ImageQuality = 'Good' | 'Acceptable' | 'Poor' | 'Ungradeable';
 
-export type ReviewStatus = 'Pending Review' | 'Reviewed' | 'Referred' | 'Follow-up Set';
+export type ReviewStatus = 'Pending Review' | 'Reviewed' | 'Referred' | 'Follow-up Set' | 'Recapture Needed' | 'Rejected (Quality)';
 
 export type ReferralStage = 
   | 'AI Screening' 
@@ -93,18 +93,21 @@ export interface ReferralItem {
 }
 
 export interface AIModelReport {
-  // 8 backend models
+  status?: string; // "active" | "rejected_poor_quality"
   iqa: {
     status: ImageQuality;
     score: number; // 0-100%
     sharpness: string;
     illumination: string;
     fieldOfView: string;
+    feedback?: string;
+    isAcceptable?: boolean;
   };
   drClassification: {
     grade: DRGrade;
     confidence: number;
-    icdrScale: number; // 0-4
+    icdrScale: number; // 0-4 or -1 if ungradeable
+    probabilities?: number[];
   };
   referableDR: {
     isReferable: boolean;
@@ -112,35 +115,66 @@ export interface AIModelReport {
     criteria: string;
   };
   microaneurysms: {
-    detected: boolean;
-    count: number;
-    quadrants: string[];
+    status?: 'active' | 'not_yet_implemented';
+    detected: boolean | null;
+    count?: number | null;
+    quadrants?: string[];
     details: string;
   };
   hemorrhages: {
-    detected: boolean;
-    type: string; // "Dot-blot & flame-shaped"
-    quadrants: string[];
+    status?: 'active' | 'not_yet_implemented';
+    detected: boolean | null;
+    type?: string | null;
+    quadrants?: string[];
+    details: string;
+  };
+  neovascularization?: {
+    status?: 'active' | 'not_yet_implemented';
+    detected: boolean | null;
     details: string;
   };
   exudates: {
-    detected: boolean;
-    pattern: string; // "Hard lipid rings near fovea"
-    macularInvolvement: boolean;
+    status?: 'active' | 'not_yet_implemented' | 'not_assessed';
+    detected: boolean | null;
+    pixelCount?: number;
+    pattern?: string;
+    macularInvolvement?: boolean;
+    quadrants?: string[];
     details: string;
   };
   opticDisc: {
-    status: 'Normal' | 'Abnormal' | 'Suspect';
-    cupToDiscRatio: number;
-    marginClarity: string;
+    status: 'Normal' | 'Abnormal' | 'Suspect' | 'Marginal Visibility' | 'not_assessed' | string;
+    detected?: boolean | null;
+    cupToDiscRatio?: number | null;
+    marginClarity?: string;
+    centerCoordinates?: [number, number] | null;
+    discPixelArea?: number;
     details: string;
   };
   vesselAnalysis: {
-    status: 'Normal' | 'Abnormal';
-    arteriovenousNicking: boolean;
-    tortuosity: string;
-    caliberRatio: string;
+    status: 'Normal' | 'Abnormal' | 'Abnormal Caliber' | 'not_assessed' | string;
+    detected?: boolean | null;
+    vesselDensity?: number;
+    arteriovenousNicking?: boolean;
+    tortuosity?: string;
+    caliberRatio?: string;
     details: string;
+  };
+  gradCam?: {
+    status?: 'active' | 'not_yet_implemented';
+    available: boolean;
+    overlayUrl?: string | null;
+    details?: string;
+  };
+  clinicalSummary?: string;
+  visualizations?: {
+    original?: string | null;
+    opticDisc?: string | null;
+    vessels?: string | null;
+    exudates?: string | null;
+    microaneurysms?: string | null;
+    hemorrhages?: string | null;
+    gradCam?: string | null;
   };
 }
 
