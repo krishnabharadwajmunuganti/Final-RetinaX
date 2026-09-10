@@ -13,7 +13,10 @@ import {
   PatientProfile,
 } from '../types';
 
-export const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+// Single-origin relative API path in production; fallback to localhost:8000 only in local Vite dev
+const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+const isViteDev = typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '3000');
+export const API_BASE = envApiUrl !== undefined ? envApiUrl : (isViteDev ? 'http://localhost:8000' : '');
 
 // Token Management
 export const authStorage = {
